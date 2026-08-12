@@ -21,19 +21,19 @@ let settings = {
   accessToken: "YOUR_META_ACCESS_TOKEN",
   wabaId: "YOUR_WHATSAPP_BUSINESS_ACCOUNT_ID",
   useMockMode: true, // Default to Developer Mock Mode for zero-cost instant testing
-  whatsappTemplateText: `🤖 *PUDU Flashbot Pro Arrival Notification*
+  whatsappTemplateText: `*PUDU Flashbot Pro Arrival Notification*
 
 Hello {{recipient_name}},
 
-Your delivery item has arrived at *{{destination}}*! 📦
+Your delivery item has arrived at *{{destination}}*.
 
-🔒 *Unlock Information:*
-• Storage Box: *Compartment #{{compartment_no}}*
-• Unlock Method: Enter 4-Digit PIN *{{passcode}}* OR tap your *NFC Card* on the robot screen.
+Unlock Details:
+• Storage Box: Compartment #{{compartment_no}}
+• Unlock Method: Enter 4-Digit PIN *{{passcode}}* OR tap your NFC Card on the robot screen.
 
 Please collect your item promptly so Flashbot Pro can proceed to its next task.
 
-Thank you!`,
+Thank you.`,
 };
 
 let activeTasks = [
@@ -427,8 +427,8 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n==================================================================`);
-  console.log(`🤖 PUDU Flashbot Pro WhatsApp Notification Server Active!`);
-  console.log(`🌐 Dashboard UI:      http://localhost:${PORT}`);
-  console.log(`⚡ PUDU Webhook URL:  http://localhost:${PORT}/api/v1/pudu/webhook`);
+  console.log(`PUDU Flashbot Pro WhatsApp Notification Server Active!`);
+  console.log(`Dashboard UI:      http://localhost:${PORT}`);
+  console.log(`PUDU Webhook URL:  http://localhost:${PORT}/api/v1/pudu/webhook`);
   console.log(`==================================================================\n`);
 });
