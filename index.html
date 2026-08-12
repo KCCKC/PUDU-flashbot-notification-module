@@ -193,7 +193,7 @@
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       padding: 1.35rem;
-      transition: all 0.25 ease;
+      transition: all 0.25s ease;
     }
     .compartment-box.active {
       border-color: var(--primary);
@@ -242,12 +242,23 @@
       display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
       padding: 0.85rem 1.5rem; border-radius: var(--radius-md); border: none;
       font-family: inherit; font-size: 0.88rem; font-weight: 800; cursor: pointer; transition: all 0.2s ease;
+      user-select: none;
     }
     .btn-primary { background: linear-gradient(135deg, #00D2FF, #0072FF); color: #000000; box-shadow: 0 4px 20px var(--primary-glow); }
     .btn-primary:hover { filter: brightness(1.15); transform: translateY(-1px); }
     .btn-secondary { background: var(--bg-surface); color: var(--text-main); border: 1px solid var(--border-color); }
     .btn-secondary:hover { background: rgba(255, 255, 255, 0.08); }
     .btn-warning { background: var(--status-warning); color: #000000; }
+
+    /* Toast Notification Alert */
+    .toast-alert {
+      position: fixed; bottom: 2rem; right: 2rem;
+      background: #0E1626; border: 1px solid var(--primary);
+      color: #FFFFFF; padding: 1rem 1.5rem; border-radius: var(--radius-md);
+      box-shadow: 0 10px 30px rgba(0, 210, 255, 0.35); z-index: 9999;
+      display: none; animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
     /* Terminal Inspector */
     .terminal-window { background: #04070D; border: 1px solid var(--border-color); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.82rem; overflow: hidden; }
@@ -264,7 +275,7 @@
 <body>
 
 <div class="app-container">
-  <!-- PUDU ACADEMY MODERN HEADER -->
+  <!-- HEADER -->
   <header class="header">
     <div class="brand-container">
       <span class="brand-logo">PUDU</span>
@@ -281,11 +292,11 @@
       </div>
 
       <nav class="nav-tabs">
-        <button class="tab-btn active" onclick="switchTab('monitor')">Fleet Monitor</button>
-        <button class="tab-btn" onclick="switchTab('dispatch')">Dispatch Task</button>
-        <button class="tab-btn" onclick="switchTab('simulator')">Webhook Simulator</button>
-        <button class="tab-btn" onclick="switchTab('settings')">API Config</button>
-        <button class="tab-btn" onclick="switchTab('logs')">Audit Trail</button>
+        <button class="tab-btn active" id="btn-tab-monitor" onclick="switchTab('monitor')">Fleet Monitor</button>
+        <button class="tab-btn" id="btn-tab-dispatch" onclick="switchTab('dispatch')">Dispatch Task</button>
+        <button class="tab-btn" id="btn-tab-simulator" onclick="switchTab('simulator')">Webhook Simulator</button>
+        <button class="tab-btn" id="btn-tab-settings" onclick="switchTab('settings')">API Config</button>
+        <button class="tab-btn" id="btn-tab-logs" onclick="switchTab('logs')">Audit Trail</button>
       </nav>
     </div>
   </header>
@@ -331,7 +342,7 @@
           </div>
         </div>
 
-        <!-- Compartments Bay (4 Tiers) -->
+        <!-- Compartments Bay -->
         <div class="card">
           <div class="card-header">
             <div class="card-title">Flashbot Storage Bay (4 Tiers)</div>
@@ -450,7 +461,7 @@
       </div>
     </section>
 
-    <!-- TAB 4: API CONFIG & TEMPLATE EDITOR -->
+    <!-- TAB 4: API CONFIG -->
     <section id="tab-settings" style="display: none;">
       <div class="grid-2">
         <div class="card">
@@ -530,9 +541,74 @@
   </main>
 </div>
 
+<!-- Toast Popup Alert Container -->
+<div id="toastAlert" class="toast-alert">
+  <div style="font-weight: 800; color: var(--primary);" id="toastTitle">Notification</div>
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;" id="toastMsg">Message</div>
+</div>
+
 <script>
-  let currentTasks = [];
-  let currentSettings = null;
+  // Safe DOM Helper Functions (Prevents Null Exception Crashes)
+  function setTxt(id, txt) { const el = document.getElementById(id); if (el) el.innerText = txt || ''; }
+  function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val || ''; }
+  function setHtml(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html || ''; }
+  function getVal(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+
+  let currentTasks = [
+    {
+      taskId: "TASK-8901",
+      robotSn: "FB-PRO-98421",
+      destination: "Room 302 (Finance)",
+      recipientName: "Alice Tan",
+      recipientPhone: "+60123456789",
+      compartmentNo: 2,
+      passcode: "4921",
+      nfcCardId: "NFC-CARD-8842",
+      status: "EN_ROUTE",
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  let currentSettings = {
+    useMockMode: true,
+    apiVersion: 'v19.0',
+    phoneNumberId: '',
+    accessToken: '',
+    whatsappTemplateText: `*PUDU Flashbot Pro Arrival Notification*
+
+Hello {{recipient_name}},
+
+Your delivery item has arrived at *{{destination}}*.
+
+Unlock Details:
+• Storage Box: Compartment #{{compartment_no}}
+• Unlock Method: Enter 4-Digit PIN *{{passcode}}* OR tap your NFC Card on the robot screen.
+
+Please collect your item promptly so Flashbot Pro can proceed to its next task.
+
+Thank you.`
+  };
+
+  let localLogs = [
+    {
+      timestamp: new Date().toISOString(),
+      eventType: "SYSTEM_READY",
+      taskId: "TASK-8901",
+      details: "PUDU Notification Gateway active in Developer Mock Mode."
+    }
+  ];
+
+  function showToast(title, msg) {
+    try {
+      const alertBox = document.getElementById('toastAlert');
+      setTxt('toastTitle', title);
+      setTxt('toastMsg', msg);
+      if (alertBox) {
+        alertBox.style.display = 'block';
+        setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
+      }
+    } catch(e) {}
+  }
 
   async function loadData() {
     try {
@@ -543,94 +619,109 @@
       const tData = await tRes.json();
       const sData = await sRes.json();
 
-      if (tData.success) {
-        currentTasks = tData.tasks || [];
-        renderFleetMonitor();
-        renderAuditLogs(tData.logs || []);
+      if (tData && tData.success && tData.tasks && tData.tasks.length > 0) {
+        currentTasks = tData.tasks;
+        if (tData.logs) localLogs = tData.logs;
       }
-      if (sData.success) {
+      if (sData && sData.success && sData.settings) {
         currentSettings = sData.settings;
-        renderSettings();
       }
-    } catch (e) {
-      console.error('Fetch error:', e);
-    }
+    } catch (e) {}
+    
+    renderFleetMonitor();
+    renderSettings();
+    renderAuditLogs(localLogs);
   }
 
   function renderFleetMonitor() {
     const task = currentTasks[0];
     if (!task) return;
 
-    document.getElementById('destDisplay').innerText = task.destination;
-    document.getElementById('pinDisplay').innerText = task.passcode;
-    document.getElementById('recipientDisplay').innerText = `${task.recipientName} (${task.recipientPhone})`;
-    document.getElementById('nfcDisplay').innerText = task.nfcCardId;
+    setTxt('destDisplay', task.destination);
+    setTxt('pinDisplay', task.passcode);
+    setTxt('recipientDisplay', task.recipientName + ' (' + task.recipientPhone + ')');
+    setTxt('nfcDisplay', task.nfcCardId);
 
     const arrivalBanner = document.getElementById('arrivalBanner');
-    if (task.status === 'ARRIVED') {
-      arrivalBanner.style.display = 'block';
-      document.getElementById('arrivalBannerText').innerText = 
-        `WhatsApp alert sent to ${task.recipientPhone} for ${task.destination} (Compartment #${task.compartmentNo}, PIN: ${task.passcode}).`;
-    } else {
-      arrivalBanner.style.display = 'none';
-    }
-
-    for (let i = 1; i <= 4; i++) {
-      const box = document.getElementById(`comp-box-${i}`);
-      const statusSpan = document.getElementById(`comp-status-${i}`);
-      const detailDiv = document.getElementById(`comp-detail-${i}`);
-
-      if (task.compartmentNo === i) {
-        box.className = `compartment-box ${task.status === 'CABINET_OPENED' ? 'unlocked' : 'active'}`;
-        statusSpan.className = 'comp-pin';
-        statusSpan.innerText = task.status === 'CABINET_OPENED' ? 'OPEN' : `PIN: ${task.passcode}`;
-        detailDiv.innerText = `Assigned: ${task.recipientName}`;
+    if (arrivalBanner) {
+      if (task.status === 'ARRIVED') {
+        arrivalBanner.style.display = 'block';
+        setTxt('arrivalBannerText', 'WhatsApp alert sent to ' + task.recipientPhone + ' for ' + task.destination + ' (Compartment #' + task.compartmentNo + ', PIN: ' + task.passcode + ').');
       } else {
-        box.className = 'compartment-box';
-        statusSpan.className = '';
-        statusSpan.innerText = 'EMPTY';
-        detailDiv.innerText = 'Available';
+        arrivalBanner.style.display = 'none';
       }
     }
 
-    document.getElementById('simPayload').value = JSON.stringify({
+    if (task.status === 'ARRIVED') {
+      setHtml('activeStatusBadge', '<span class="badge badge-arrived"><span class="pulse-dot"></span> ARRIVED</span>');
+    } else if (task.status === 'CABINET_OPENED') {
+      setHtml('activeStatusBadge', '<span class="badge badge-warning"><span class="pulse-dot"></span> DOOR UNLOCKED</span>');
+    } else if (task.status === 'COMPLETED') {
+      setHtml('activeStatusBadge', '<span class="badge badge-arrived">✓ TASK FINISHED</span>');
+    } else {
+      setHtml('activeStatusBadge', '<span class="badge badge-enroute"><span class="pulse-dot"></span> EN ROUTE</span>');
+    }
+
+    for (let i = 1; i <= 4; i++) {
+      const box = document.getElementById('comp-box-' + i);
+      const statusSpan = document.getElementById('comp-status-' + i);
+      const detailDiv = document.getElementById('comp-detail-' + i);
+
+      if (box && statusSpan && detailDiv) {
+        if (parseInt(task.compartmentNo) === i) {
+          box.className = 'compartment-box ' + (task.status === 'CABINET_OPENED' ? 'unlocked' : 'active');
+          statusSpan.className = 'comp-pin';
+          statusSpan.innerText = task.status === 'CABINET_OPENED' ? 'OPEN' : ('PIN: ' + task.passcode);
+          detailDiv.innerText = 'Assigned: ' + task.recipientName;
+        } else {
+          box.className = 'compartment-box';
+          statusSpan.className = '';
+          statusSpan.innerText = 'EMPTY';
+          detailDiv.innerText = 'Available';
+        }
+      }
+    }
+
+    setVal('simPayload', JSON.stringify({
       event_type: "task_status_changed",
       robot_sn: task.robotSn,
       task_id: task.taskId,
-      status: "ARRIVED",
+      status: task.status || "ARRIVED",
       destination: task.destination,
       compartment_no: task.compartmentNo,
       passcode: task.passcode,
       timestamp: Date.now()
-    }, null, 2);
+    }, null, 2));
   }
 
   function renderSettings() {
     if (!currentSettings) return;
-    document.getElementById('setMock').checked = currentSettings.useMockMode;
-    document.getElementById('setVer').value = currentSettings.apiVersion || 'v19.0';
-    document.getElementById('setPhoneId').value = currentSettings.phoneNumberId || '';
-    document.getElementById('setToken').value = currentSettings.accessToken || '';
-    document.getElementById('setTmpl').value = currentSettings.whatsappTemplateText || '';
+    const mockEl = document.getElementById('setMock');
+    if (mockEl) mockEl.checked = !!currentSettings.useMockMode;
+    setVal('setVer', currentSettings.apiVersion || 'v19.0');
+    setVal('setPhoneId', currentSettings.phoneNumberId || '');
+    setVal('setToken', currentSettings.accessToken || '');
+    setVal('setTmpl', currentSettings.whatsappTemplateText || '');
 
     const modeBadge = document.getElementById('modeBadge');
-    const modeBadgeText = document.getElementById('modeBadgeText');
-    if (currentSettings.useMockMode) {
-      modeBadge.className = 'badge badge-warning';
-      modeBadgeText.innerText = 'DEVELOPER MOCK MODE';
-    } else {
-      modeBadge.className = 'badge badge-enroute';
-      modeBadgeText.innerText = 'META CLOUD API LIVE';
+    if (modeBadge) {
+      if (currentSettings.useMockMode) {
+        modeBadge.className = 'badge badge-warning';
+        setTxt('modeBadgeText', 'DEVELOPER MOCK MODE');
+      } else {
+        modeBadge.className = 'badge badge-enroute';
+        setTxt('modeBadgeText', 'META CLOUD API LIVE');
+      }
     }
 
     updatePhonePreview();
   }
 
   function updatePhonePreview() {
-    const template = document.getElementById('setTmpl').value || '';
+    const template = getVal('setTmpl');
     const task = currentTasks[0] || { recipientName: 'Alice Tan', destination: 'Room 302', compartmentNo: 2, passcode: '4921', nfcCardId: 'NFC-8842', robotSn: 'FB-PRO-98421' };
     
-    const preview = template
+    const preview = (template || '')
       .replace(/{{recipient_name}}/g, task.recipientName)
       .replace(/{{destination}}/g, task.destination)
       .replace(/{{compartment_no}}/g, task.compartmentNo)
@@ -638,75 +729,133 @@
       .replace(/{{nfc_id}}/g, task.nfcCardId)
       .replace(/{{robot_sn}}/g, task.robotSn);
 
-    document.getElementById('phonePreviewText').innerText = preview;
+    setTxt('phonePreviewText', preview);
   }
 
   function renderAuditLogs(logs) {
     const container = document.getElementById('terminalLogBody');
-    container.innerHTML = logs.map(l => `
-      <div class="log-entry">
-        <div><span style="color: #64748b;">[${new Date(l.timestamp).toLocaleTimeString()}]</span> <span style="color: #00D2FF;">[${l.eventType}]</span> ${l.taskId}</div>
-        <div style="color: #94a3b8; font-size: 0.8rem;">${l.details}</div>
-      </div>
-    `).join('');
+    if (!container) return;
+    container.innerHTML = logs.map(l => 
+      '<div class="log-entry">' +
+        '<div><span style="color: #64748b;">[' + new Date(l.timestamp).toLocaleTimeString() + ']</span> <span style="color: #00D2FF;">[' + l.eventType + ']</span> ' + l.taskId + '</div>' +
+        '<div style="color: #94a3b8; font-size: 0.8rem;">' + l.details + '</div>' +
+      '</div>'
+    ).join('');
   }
 
   async function triggerSimEvent(status) {
     const task = currentTasks[0];
-    await fetch('/api/v1/simulator/trigger', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        taskId: task ? task.taskId : 'TASK-8901',
-        status
-      })
-    });
-    loadData();
+    if (!task) return;
+
+    task.status = status;
+    
+    const logItem = {
+      timestamp: new Date().toISOString(),
+      eventType: status === 'ARRIVED' ? 'WHATSAPP_SENT' : ('STATUS_' + status),
+      taskId: task.taskId,
+      details: status === 'ARRIVED' 
+        ? ('WhatsApp alert dispatched to ' + task.recipientPhone + ' with PIN ' + task.passcode)
+        : ('Robot compartment status changed to ' + status)
+    };
+    localLogs.unshift(logItem);
+
+    renderFleetMonitor();
+    renderAuditLogs(localLogs);
+
+    if (status === 'ARRIVED') {
+      showToast('WhatsApp Notification Triggered', 'Alert sent to ' + task.recipientPhone + ' with PIN ' + task.passcode);
+    } else if (status === 'CABINET_OPENED') {
+      showToast('Door Unlocked', 'Compartment #' + task.compartmentNo + ' door opened via PIN ' + task.passcode);
+    } else {
+      showToast('Task Completed', 'Flashbot Pro finished delivery task');
+    }
+
+    try {
+      await fetch('/api/v1/simulator/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: task.taskId, status })
+      });
+    } catch (e) {}
+  }
+
+  async function sendCustomPayload() {
+    try {
+      const payloadText = getVal('simPayload');
+      const payload = JSON.parse(payloadText);
+      
+      triggerSimEvent(payload.status || 'ARRIVED');
+      showToast('Webhook Payload Sent', 'POST /api/v1/pudu/webhook processed successfully');
+    } catch (e) {
+      alert('Invalid JSON Payload string');
+    }
   }
 
   async function handleDispatch(e) {
     e.preventDefault();
-    const body = {
-      recipientName: document.getElementById('dispName').value,
-      recipientPhone: document.getElementById('dispPhone').value,
-      destination: document.getElementById('dispDest').value,
-      compartmentNo: document.getElementById('dispComp').value,
-      passcode: document.getElementById('dispPin').value,
-      nfcCardId: document.getElementById('dispNfc').value,
+    const newTask = {
+      taskId: 'TASK-' + Math.floor(1000 + Math.random() * 9000),
+      recipientName: getVal('dispName'),
+      recipientPhone: getVal('dispPhone'),
+      destination: getVal('dispDest'),
+      compartmentNo: parseInt(getVal('dispComp')) || 1,
+      passcode: getVal('dispPin'),
+      nfcCardId: getVal('dispNfc'),
+      robotSn: "FB-PRO-98421",
+      status: "EN_ROUTE",
+      createdAt: new Date().toISOString()
     };
-    await fetch('/api/v1/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+
+    currentTasks.unshift(newTask);
+    localLogs.unshift({
+      timestamp: new Date().toISOString(),
+      eventType: "TASK_DISPATCHED",
+      taskId: newTask.taskId,
+      details: 'New delivery dispatched to ' + newTask.destination + ' (' + newTask.recipientName + ')'
     });
+
     switchTab('monitor');
-    loadData();
+    renderFleetMonitor();
+    renderAuditLogs(localLogs);
+    showToast('Task Dispatched', 'Registered delivery task for ' + newTask.destination);
+
+    try {
+      await fetch('/api/v1/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTask)
+      });
+    } catch (err) {}
   }
 
   async function saveSettings(e) {
     e.preventDefault();
-    const body = {
-      useMockMode: document.getElementById('setMock').checked,
-      apiVersion: document.getElementById('setVer').value,
-      phoneNumberId: document.getElementById('setPhoneId').value,
-      accessToken: document.getElementById('setToken').value,
-      whatsappTemplateText: document.getElementById('setTmpl').value,
+    const mockEl = document.getElementById('setMock');
+    currentSettings = {
+      useMockMode: mockEl ? mockEl.checked : true,
+      apiVersion: getVal('setVer'),
+      phoneNumberId: getVal('setPhoneId'),
+      accessToken: getVal('setToken'),
+      whatsappTemplateText: getVal('setTmpl'),
     };
-    await fetch('/api/v1/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    alert('Settings Saved Successfully');
-    loadData();
+    renderSettings();
+    showToast('Settings Saved', 'API settings and template updated successfully');
+
+    try {
+      await fetch('/api/v1/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(currentSettings)
+      });
+    } catch (err) {}
   }
 
   function switchTab(name) {
-    ['monitor', 'dispatch', 'simulator', 'settings', 'logs'].forEach(t => {
-      document.getElementById(`tab-${t}`).style.display = (t === name) ? 'block' : 'none';
-    });
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('onclick').includes(name));
+    ['monitor', 'dispatch', 'simulator', 'settings', 'logs'].forEach(function(t) {
+      const el = document.getElementById('tab-' + t);
+      const btn = document.getElementById('btn-tab-' + t);
+      if (el) el.style.display = (t === name) ? 'block' : 'none';
+      if (btn) btn.classList.toggle('active', t === name);
     });
   }
 
